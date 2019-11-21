@@ -1,11 +1,7 @@
-.map {
-	border: medium solid #999;
-}
-
 .states {
-    fill: #FFF;
-    stroke: #CCC;
-    stroke-width: 1px;
+    fill: #fff;
+    stroke: #bbac;
+    stroke-width: 2px;
     stroke-linecap: round;
 }
 
@@ -15,8 +11,8 @@
 }
 
 .chart {
-    float: right;
-    margin: 7px 20px 0 0;
+    top: 30px;
+    right: 100px;
 }
 
 .chartTitle {

@@ -3,9 +3,11 @@
     
 //sudo-global variables
 // data join array
-var attrArray = ["National_Battlefield", "National_Historic_Site", "National_Preserve", "National_Monument", "National_Park", "National_Recreation_Area"];
+var attrArray = ["National Battlefield", "National Historic Site", "National Preserve", "National Monument", "National Park", "National Recreation Area"];
+    
     
 var expressed = attrArray[0]; // initial attr
+    
     
 // chart dimensions
 var chartWidth = window.innerWidth * 0.45,
@@ -15,21 +17,19 @@ var chartWidth = window.innerWidth * 0.45,
     topBottomPadding = 5,
     chartInnerWidth = chartWidth - leftPadding - rightPadding,
     chartInnerHeight = chartHeight - topBottomPadding * 2,
-    translate = "translate(" + leftPadding + "," + topBottomPadding + ")";
-
-// create scale to size bars proportionally to frame and for axis
-var yScale = d3.scaleLinear()
-    .range([650, 0])
-    .domain([0, 100]);
+    translate = "translate(" + leftPadding + "," + topBottomPadding + ")",
+    chart;   
+    
     
 // start script when window loads
 window.onload = setMap();
+    
     
 // set up choropleth map
 function setMap(){
     
 	// map frame dimensions
-	var width = window.innerWidth * 0.5,
+	var width = window.innerWidth * 0.7,
 		height = 650;
     
     // create new svg container for the map
@@ -38,13 +38,19 @@ function setMap(){
 		.attr("class", "map")
 		.attr("width", width)
 		.attr("height", height);
-
+    
+    // make svg container for chart
+    
+    
+    
+    
+    
 	// create Albers projection
 	var projection = d3.geoAlbers()
 		.center([0, 50])
 		.rotate([100, 0])
-		.parallels([45, 45.5])
-		.scale(500)
+		.parallels([45, 45.3])
+		.scale(450)
 		.translate([width / 2, height / 2]);
 
 	var path = d3.geoPath()
@@ -62,21 +68,22 @@ function setMap(){
         var usStates = topojson.feature(us_states, us_states.objects.states).features;   
         
         // join csvData to geoJSON states
-        states = joinData(usStates, csvData);
+        var states = joinData(usStates, csvData);
         
         // create color scale
         var colorScale = makeColorScale(csvData);
         
+        // add dropdown
+        createDropdown(csvData);
+        
         // add states to the map
         setStates(usStates, map, path, colorScale);
         
-        // add bar chart to page
-        setChart(csvData, colorScale);
-        
-        // add dropdown
-        createDropdown();
+        // add pie chart
+        makeChart(csvData, colorScale);
     };
 }; // end setMap
+    
     
 function joinData(usStates, csvData){
     
@@ -104,19 +111,20 @@ function joinData(usStates, csvData){
         };        
     return usStates;
 }; // end joinData
+    
 
 // function to make color scale generator
 function makeColorScale(data){
     var colorClasses = [
-    "#D4B9DA",
-    "#C994C7",
-    "#DF65B0",
-    "#DD1C77",
-    "#980043"
+    "#ffffcc",
+    "#c2e699",
+    "#78c679",
+    "#31a354",
+    "#006837"
     ];
     
-    // scale generator
-    var colorScale = d3.scaleThreshold()
+    // create scale generator
+    var colorScale = d3.scaleQuantile()
         .range(colorClasses);
     
     // build array of values in expressed attr
@@ -125,23 +133,13 @@ function makeColorScale(data){
         var val = parseFloat(data[i][expressed]);
         domainArray.push(val);
     };
-    
-    // cluster data using ckmeans algorithm to create natural breaks
-    var clusters = ss.ckmeans(domainArray, 5);
-    
-    // reset domain array to cluster minimums
-    domainArray = clusters.map(function(d){
-        return d3.min(d);
-    });
-    
-    // rm first val from domain array to create class breakpoints
-    domainArray.shift();
 
-    // assign array of last 4 cluster minimums as domain
+    // assign array of expressed values as scale domain
     colorScale.domain(domainArray);
 
     return colorScale;
 }; //end makeColorScale
+    
     
 // function to test for data value and return color
 function choropleth(props, colorScale){
@@ -151,9 +149,10 @@ function choropleth(props, colorScale){
     if (typeof val == 'number' && !isNaN(val)){
         return colorScale(val);
     } else {
-        return "#CCC";
+        return "#ddd";
     };
 }; // end choropleth
+    
         
 function setStates(usStates, map, path, colorScale){
     var states = map.selectAll(".states")
@@ -167,66 +166,8 @@ function setStates(usStates, map, path, colorScale){
         .style("fill", function(d){
             return choropleth(d.properties, colorScale);
         });
-    console.log(states);
 }; // end setStates
-
-// set up bar chart
-function setChart(csvData, colorScale){
-    // create new svg for bar chart
-    var chart = d3.select("body")
-        .append("svg")
-          .attr("width", chartWidth)
-          .attr("height", chartHeight)
-          .attr("radius", Math.min(chartInnerWidth, chartInnerHeight) / 2)
-        .attr("class", "chart")
-        .append("g")
-          .attr("transform", "translate(" + chartInnerWidth / 2 + "," + chartInnerHeight / 2 + ")");
     
-    var color = colorScale(csvData);
-    
-    // calc position of each pie group
-    var pie = d3.pie()
-        //.sort(function(a, b){
-            //return b[expressed]-a[expressed]
-        //})
-        .sort(null)
-        .attr("class", function(d){
-            return "pie " + d.Name;
-        })
-        .value(function(d) {return d.value; })
-     var path = d3.arc()
-        .outerRadius(radius - 10)
-        .innerRadius(radius - 70);
-
-    var label = d3.arc()
-        .outerRadius(radius - 40)
-        .innerRadius(radius - 40);
-    
-    for (var i=0; i<csvData.length; i++){
-            var csvNPS = csvData[i];
-            var csvKey = csvNPS.Name;
-        
-    csvData(function(d) {
-        d.population = +d.population;
-        return d;
-    }, function(error, data) {
-        if (error) throw error;
-
-    var arc = g.selectAll(".arc")
-        .data(pie(data))
-        .enter().append("g")
-          .attr("class", "arc");
-
-    arc.append("path")
-        .attr("d", path)
-        .attr("fill", function(d) { return color(d.data.age); });
-
-    arc.append("text")
-        .attr("transform", function(d) { return "translate(" + label.centroid(d) + ")"; })
-        .attr("dy", "0.35em")
-        .text(function(d) { return d.data.Name; });
-    });
-}; // end setChart
     
 // create dropdown menu to select attribute to display
 function createDropdown(csvData){
@@ -252,7 +193,88 @@ function createDropdown(csvData){
         .attr("value", function(d){ return d })
         .text(function(d){ return d });
 }; // end createDropdown
+
+
+// event listener to update map and chart when attr is picked    
+function changeAttribute(attribute, csvData){
+    //change the expressed attribute
+    expressed = attribute;   
+
+    //recreate the color scale
+    var colorScale = makeColorScale(csvData);
+
+    //recolor enumeration units
+    var states = d3.selectAll(".states")
+        .transition()
+        .duration(1000)
+        .style("fill", function(d){
+            return choropleth(d.properties, colorScale)
+        });
     
+    makeChart(csvData, colorScale);   
+    
+}; //end changeAttribute
+    
+    
+// set up pie chart
+function makeChart(csvData, colorScale){ 
+    
+    var chartMargin = 40,
+    radius = Math.min(chartWidth, chartHeight) /2 - chartMargin;
+    
+    // build array of values in expressed attr
+    var chartArray = [];
+    for (var i=0; i<csvData.length; i++){
+        var val = parseFloat(csvData[i][expressed]);
+        chartArray.push(val);
+    };  
+    
+    // chloropleth color function (doesn't work with props[expressed], so remade here)
+    function chartopleth(props, colorScale){
+        // test that attr val is number
+        var val = parseFloat(props);
+        // if attr val exists, assign a color; else set as gray
+        if (typeof val == 'number' && !isNaN(val)){
+            return colorScale(val);
+        } else {
+            return "#000";
+        };
+    }; // end 
+    
+    // calc position of each pie slice
+    var pie = d3.pie()
+        .value(function(d) {return d.value; })
+    var data_ready = pie(d3.entries(chartArray));
+
+    console.log(data_ready);
+    
+    var chart = d3.select("body")
+    .append("svg")
+    .attr("width", chartInnerWidth)
+    .attr("height", chartInnerHeight)
+    .attr("class", "chart")
+    .append("g")
+      .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight / 2 + ")");
+
+    // map chart to data
+        var m = chart.selectAll(".pie")
+        .data(data_ready)
+        .enter()
+        .append("path")
+        .transition()
+        .duration(1000)
+        .attr('d', d3.arc()
+             .innerRadius(radius * 0.4)
+             .outerRadius(radius)
+         )
+        .attr('fill', function(d){
+            return chartopleth(d.value, colorScale) })        
+        .attr("stroke", "white")
+        .style("stroke-width", "1.5px")
+        .style("opacity", 1)
+
+    
+}; // end makeChart
 
     
 })();
