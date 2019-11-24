@@ -10,7 +10,7 @@ var expressed = attrArray[0]; // initial attr
     
     
 // chart dimensions
-var chartWidth = window.innerWidth * 0.45,
+var chartWidth = window.innerWidth * 0.35,
     chartHeight = 650,
     leftPadding = 25,
     rightPadding = 2,
@@ -19,6 +19,15 @@ var chartWidth = window.innerWidth * 0.45,
     chartInnerHeight = chartHeight - topBottomPadding * 2,
     translate = "translate(" + leftPadding + "," + topBottomPadding + ")",
     chart;   
+    
+// make svg container for chart
+var chart = d3.select("body")
+    .append("svg")
+      .attr("width", chartInnerWidth)
+      .attr("height", chartInnerHeight)
+      .attr("class", "chart")
+    .append("g")
+      .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight / 2 + ")");  
     
     
 // start script when window loads
@@ -29,7 +38,7 @@ window.onload = setMap();
 function setMap(){
     
 	// map frame dimensions
-	var width = window.innerWidth * 0.7,
+	var width = window.innerWidth * 0.6,
 		height = 650;
     
     // create new svg container for the map
@@ -37,13 +46,7 @@ function setMap(){
 		.append("svg")
 		.attr("class", "map")
 		.attr("width", width)
-		.attr("height", height);
-    
-    // make svg container for chart
-    
-    
-    
-    
+		.attr("height", height);  
     
 	// create Albers projection
 	var projection = d3.geoAlbers()
@@ -74,7 +77,7 @@ function setMap(){
         var colorScale = makeColorScale(csvData);
         
         // add dropdown
-        createDropdown(csvData);
+        createDropdown(csvData, map);
         
         // add states to the map
         setStates(usStates, map, path, colorScale);
@@ -153,6 +156,19 @@ function choropleth(props, colorScale){
     };
 }; // end choropleth
     
+function setTitle(map, data) {
+    //create a text element for the map title
+    var chartTitle = map.append("text")
+        .attr("x", 40)
+        .attr("y", 40)
+        .attr("class", "chartTitle")
+        .text("Square miles of " + data + " per state");
+}
+    
+function updateTitle(data){
+    var chartTitle = d3.select(".chartTitle")
+        .text("Square miles of " + data + " per state");
+}
         
 function setStates(usStates, map, path, colorScale){
     var states = map.selectAll(".states")
@@ -164,26 +180,36 @@ function setStates(usStates, map, path, colorScale){
 		})
 		.attr("d", path)
         .style("fill", function(d){
-            return choropleth(d.properties, colorScale);
-        });
-}; // end setStates
+            return choropleth(d.properties, colorScale)}
+        )
+        .on("mouseover", function(d){
+            highlight(d.properties)})
+        .on("mouseout", function(d){
+            dehighlight(d.properties)})
+        .on("mousemove", moveLabel);
+            
+        var desc = states.append("desc")
+        .text('{"stroke": "#bbac", "stroke-width": "2px", "opacity": "1"}');
+    
+        setTitle(map, expressed);
+    }; // end setStates
     
     
 // create dropdown menu to select attribute to display
-function createDropdown(csvData){
+function createDropdown(csvData, map){
     // add select element
     var dropdown = d3.select("body")
         .append("select")
         .attr("class", "dropdown")
         .on("change", function(){
-            changeAttribute(this.value, csvData)
+            changeAttribute(this.value, csvData, map)
         });
 
     // add initial option
     var titleOption = dropdown.append("option")
         .attr("class", "titleOption")
         .attr("disabled", "true")
-        .text("Select Attribute");
+        .text("Select National Park Service Unit");
 
     // add attribute name options
     var attrOptions = dropdown.selectAll("attrOptions")
@@ -196,7 +222,7 @@ function createDropdown(csvData){
 
 
 // event listener to update map and chart when attr is picked    
-function changeAttribute(attribute, csvData){
+function changeAttribute(attribute, csvData, map){
     //change the expressed attribute
     expressed = attribute;   
 
@@ -212,22 +238,20 @@ function changeAttribute(attribute, csvData){
         });
     
     makeChart(csvData, colorScale);   
+    updateTitle(expressed);
     
 }; //end changeAttribute
     
     
 // set up pie chart
 function makeChart(csvData, colorScale){ 
-    
-    var chartMargin = 40,
-    radius = Math.min(chartWidth, chartHeight) /2 - chartMargin;
-    
+
     // build array of values in expressed attr
-    var chartArray = [];
+    var area = [];
     for (var i=0; i<csvData.length; i++){
         var val = parseFloat(csvData[i][expressed]);
-        chartArray.push(val);
-    };  
+        area.push(val);
+    };
     
     // chloropleth color function (doesn't work with props[expressed], so remade here)
     function chartopleth(props, colorScale){
@@ -241,40 +265,130 @@ function makeChart(csvData, colorScale){
         };
     }; // end 
     
+    // arc generator
+    var arcGenerator = d3.arc()
+        .innerRadius(radius * 0.6)
+        .outerRadius(radius)
+    
+    // set size of chart
+    var chartMargin = 40,
+    radius = Math.min(chartWidth, chartHeight) /2 - chartMargin;
+    
     // calc position of each pie slice
     var pie = d3.pie()
         .value(function(d) {return d.value; })
-    var data_ready = pie(d3.entries(chartArray));
-
-    console.log(data_ready);
     
-    var chart = d3.select("body")
-    .append("svg")
-    .attr("width", chartInnerWidth)
-    .attr("height", chartInnerHeight)
-    .attr("class", "chart")
-    .append("g")
-      .attr("transform", "translate(" + chartWidth / 2 + "," + chartHeight / 2 + ")");
-
+    // get state name
+    var key = function(d){ return d.data.name; };
+    
     // map chart to data
-        var m = chart.selectAll(".pie")
-        .data(data_ready)
+        var c = chart.selectAll('.pieSlice')
+        .data(pie(d3.entries(area)), key)
         .enter()
-        .append("path")
+        .append('path')
+        .sort(function(a,b){
+            return b.value - a.value;
+            })
         .transition()
         .duration(1000)
         .attr('d', d3.arc()
-             .innerRadius(radius * 0.4)
+             .innerRadius(radius * 0.6)
              .outerRadius(radius)
-         )
+        )
         .attr('fill', function(d){
-            return chartopleth(d.value, colorScale) })        
-        .attr("stroke", "white")
-        .style("stroke-width", "1.5px")
-        .style("opacity", 1)
-
+            return chartopleth(d.value, colorScale) }) 
+        .attr('stroke', 'white')
+        .style('stroke-width', '1px')
+        .style("opacity", 1) ;
     
 }; // end makeChart
+    
+ //function to highlight enumeration units and bars
+function highlight(props){
+    //change stroke
+    
+    var selected = d3.selectAll("." + props["name"])
+        .style("stroke", "white")
+        .style("opacity", "0.6");
+    
+        setLabel(props);
+    
+}; // end highlight
+    
+//function to reset the element style on mouseout
+function dehighlight(props){
+    var selected = d3.selectAll("." + props["name"])
+        .style("stroke", function(){
+            return getStyle(this, "stroke")
+        })
+        .style("stroke-width", function(){
+            return getStyle(this, "stroke-width")
+        })
+        .style("opacity", 1);
+    
+    d3.select(".infolabel")
+        .remove();
+
+    function getStyle(element, styleName){
+        var styleText = d3.select(element)
+            .select("desc")
+            .text();
+
+        var styleObject = JSON.parse(styleText);
+
+        return styleObject[styleName];
+    };
+}; // end dehighlight
+    
+
+//function to create dynamic label
+function setLabel(props){
+    
+    // set NaN as 0    
+    var val = props[expressed];
+    val = val ? val: 0;
+    
+    // round to 2 decimals
+    var sqMi = Math.round(val * 100) / 100;
+    
+    // get state name
+    state = props.name;
+    
+    //label content
+    var labelAttribute = "<h4>" + state +
+        " has " + sqMi + " sq mi of " + expressed + "</h4>";
+
+    //create info label div
+    var infolabel = d3.select("body")
+        .append("div")
+        .attr("class", "infolabel")
+        .attr("id", props.name + "_label")
+        .html(labelAttribute);
+};
+    
+//function to move info label with mouse
+function moveLabel(){
+    //get width of label
+    var labelWidth = d3.select(".infolabel")
+        .node()
+        .getBoundingClientRect()
+        .width;
+
+    //use coordinates of mousemove event to set label coordinates
+    var x1 = d3.event.clientX + 10,
+        y1 = d3.event.clientY - 75,
+        x2 = d3.event.clientX - labelWidth - 10,
+        y2 = d3.event.clientY + 25;
+
+    //horizontal label coordinate, testing for overflow
+    var x = d3.event.clientX > window.innerWidth - labelWidth - 20 ? x2 : x1; 
+    //vertical label coordinate, testing for overflow
+    var y = d3.event.clientY < 75 ? y2 : y1; 
+
+    d3.select(".infolabel")
+        .style("left", x + "px")
+        .style("top", y + "px");
+};
 
     
 })();

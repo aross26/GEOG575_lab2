@@ -1,7 +1,7 @@
 .states {
     fill: #fff;
     stroke: #bbac;
-    stroke-width: 2px;
+    stroke-width: 1px;
     stroke-linecap: round;
 }
 
@@ -13,6 +13,12 @@
 .chart {
     top: 30px;
     right: 100px;
+}
+
+.pieSlice {
+    fill: #fff;
+    stroke: #bbac;
+    stroke-width: 2px;    
 }
 
 .chartTitle {
@@ -61,4 +67,23 @@
 
 option {
     font-weight: normal;
+}
+
+.infolabel {
+    position: absolute;
+    height: 50px;
+    min-width: 100px;
+    font-family: sans-serif;
+    color: #fff;
+    background-color: #000;
+    border: solid thin #fff;
+    padding: 5px 10px;
+}
+
+.infolabel h1 {
+    margin: 0 20px 0 0;
+    padding: 0;
+    font-family: sans-serif;
+    display: inline-block;
+    line-height: 1em;
 }
